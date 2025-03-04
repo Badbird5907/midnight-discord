@@ -4,45 +4,78 @@ const chokidar = require('chokidar');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const srcDir = path.join(__dirname, '..', 'src');
-const baseFile = path.join(__dirname, '..', 'midnight-refresh.theme.css');
-const outputFile = process.env.DEV_OUTPUT_PATH;
-const pathToIgnore = 'https://refact0r.github.io/midnight-discord/';
+// File and directory paths
+const baseFile = path.join(__dirname, '..', '/themes/midnight-refresh.theme.css');
+const buildFile = path.join(__dirname, '..', '/build/midnight.css');
+const srcDir = path.join(__dirname, '..', '/src');
+const outputPaths = process.env.DEV_OUTPUT_PATH ? process.env.DEV_OUTPUT_PATH.split(',') : [];
 
-if (!outputFile) {
+// Ensure output paths are set
+if (outputPaths.length === 0) {
 	console.error('DEV_OUTPUT_PATH is not set in .env file');
 	process.exit(1);
 }
 
-async function replaceImports(content) {
-	const regex = /@import url\(['"]([^'"]+)['"]\);/g;
-	let match;
-	let results = [];
+// Combine all CSS files from the source directory
+function combineSourceFiles() {
+	let combinedCSS = '';
 
-	while ((match = regex.exec(content)) !== null) {
-		let importPath = match[1].replace(pathToIgnore, '');
-		let fullPath = path.join(__dirname, '..', importPath);
-		let importContent = fs.readFileSync(fullPath, 'utf8');
-		results.push(match[0], importContent);
-	}
+	const files = fs
+		.readdirSync(srcDir)
+		.filter((file) => file.endsWith('.css'))
+		.map((file) => path.join(srcDir, file));
 
-	for (let i = 0; i < results.length; i += 2) {
-		content = content.replace(results[i], results[i + 1]);
-	}
+	files.forEach((file) => {
+		const content = fs.readFileSync(file, 'utf8');
+		combinedCSS += `/* ${path.basename(file)} */\n${content}\n`;
+	});
 
-	return content;
+	fs.writeFileSync(buildFile, combinedCSS);
+	return combinedCSS;
 }
 
-async function combineCSS() {
-	let combinedCSS = fs.readFileSync(baseFile, 'utf8');
-	combinedCSS = await replaceImports(combinedCSS);
-	fs.writeFileSync(outputFile, combinedCSS);
-	console.log('Updated development CSS file.');
+// Process the base file and replace imports with actual content
+function processBaseFile(compiledCSS) {
+	const baseContent = fs.readFileSync(baseFile, 'utf8');
+	const importRegex = /@import\s+url\(['"]?[^'"]+['"]?\);/g;
+
+	const processedContent = baseContent.replace(importRegex, compiledCSS);
+
+	outputPaths.forEach((outputPath) => {
+		fs.writeFileSync(outputPath, processedContent);
+		console.log(`Updated ${outputPath}`);
+	});
 }
 
-combineCSS();
+// Main function to process files
+function processFiles() {
+	try {
+		const compiledCSS = combineSourceFiles();
+		processBaseFile(compiledCSS);
+	} catch (error) {
+		console.error('Error processing files:', error);
+	}
+}
 
-chokidar.watch(srcDir).on('change', (event, path) => {
-	console.log('Changes detected. Rebuilding...');
-	combineCSS();
+processFiles();
+
+// Set up watchers
+const watcher = chokidar.watch([baseFile, `${srcDir}/**/*.css`], {
+	ignoreInitial: true,
 });
+
+// Watch for changes
+watcher
+	.on('change', (filePath) => {
+		console.log(`File changed: ${filePath}`);
+		processFiles();
+	})
+	.on('add', (filePath) => {
+		console.log(`New file added: ${filePath}`);
+		processFiles();
+	})
+	.on('unlink', (filePath) => {
+		console.log(`File deleted: ${filePath}`);
+		processFiles();
+	})
+	.on('error', (error) => console.error(`Watcher error: ${error}`));
