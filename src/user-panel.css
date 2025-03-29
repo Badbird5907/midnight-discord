@@ -4,7 +4,7 @@
     initial-value: off;
 }
 
-@container root style(--small-user-panel: on) {
+@container body style(--small-user-panel: on) {
     .visual-refresh {
         .base_c48ade {
             grid-template-areas:
@@ -12,6 +12,9 @@
                 'guildsList notice notice'
                 'guildsList channelsList page'
                 'guildsList userPanel page';
+        }
+        .panels_c48ade {
+            max-width: calc(var(--custom-guild-sidebar-width) - var(--custom-guild-list-width));
         }
     }
 }
