@@ -1,15 +1,15 @@
-@property --background-image {
-    syntax: 'on | off';
-    inherits: false;
-    initial-value: off;
-}
-
 body {
     --background-image-url: url('');
 }
 
+@property --background-image {
+    syntax: 'off | on';
+    inherits: false;
+    initial-value: off;
+}
+
 @container body style(--background-image: on) {
-    .visual-refresh .bg__960e4 {
+    #app-mount ._960e4207cea8323e-bg {
         background: var(--background-image-url);
         background-size: cover;
         background-position: center;
